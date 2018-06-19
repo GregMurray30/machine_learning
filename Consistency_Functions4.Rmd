@@ -1,0 +1,360 @@
+---
+title: "Consistency_Functions"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+setwd('/Users/gregmurray/Documents/MachineLearning/Mortgage_Project/hmda14')
+rm(list=ls()) 
+```{r}
+library(magrittr)
+library(data.table)
+library(tidyr)
+library(dplyr)
+library(e1071)
+library(MASS)
+library(neuralnet)
+library(AER)
+library(usdm)
+```
+
+
+```{r}
+L1_reduced=fread('L1_reduced.csv')[,-1]
+L2_reduced=fread('L2_reduced.csv')[,-1]
+L3_reduced=fread('L3_reduced.csv')[,-1]
+L4_reduced=fread('L4_reduced.csv')[,-1]
+L5_reduced=fread('L5_reduced.csv')[,-1]
+L6_reduced=fread('L6_reduced.csv')[,-1]
+L7_reduced=fread('L7_reduced.csv')[,-1]
+L8_reduced=fread('L8_reduced.csv')[,-1]
+L9_reduced=fread('L9_reduced.csv')[,-1]
+L10_reduced=fread('L10_reduced.csv')[,-1]
+L11_reduced=fread('L11_reduced.csv')[,-1]
+L12_reduced=fread('L12_reduced.csv')[,-1]
+L13_reduced=fread('L13_reduced.csv')[,-1]
+L14_reduced=fread('L14_reduced.csv')[,-1]
+L15_reduced=fread('L15_reduced.csv')[,-1]
+L16_reduced=fread('L16_reduced.csv')[,-1]
+L17_reduced=fread('L17_reduced.csv')[,-1]
+L18_reduced=fread('L18_reduced.csv')[,-1]
+L19_reduced=fread('L19_reduced.csv')[,-1]
+L20_reduced=fread('L20_reduced.csv')[,-1]
+
+dt_all = fread('hmda_all.csv')
+# summary(dt_all)
+```
+
+
+# Cleanup Dataset
+```{r}
+clean_data <- function(dt) {
+  
+  dt = dt[,-1]
+  #summary(dt )
+  dt$ACTION = as.numeric(dt$ACTION)
+  dt = dt[dt$ACTION %in% c(1,2, 3, 7,8)]
+  dt$approved = ifelse(dt$ACTION %in% c(1, 2, 8), 1,0)
+  dt$app_race[is.na(dt$app_race)] = "NA"
+
+  dt$app_race = as.factor(dt$app_race)
+  
+  dt$app_race = as.factor(dt$app_race)
+  dt$APP_SEX = as.factor(dt$APP_SEX)
+  dt$COAP_SEX = as.factor(dt$COAP_SEX)
+  dt$LOAN_TYPE = as.factor(dt$LOAN_TYPE)
+  dt$PURPOSE = as.factor(dt$PURPOSE)
+  dt$OCCUPANCY = as.factor(dt$OCCUPANCY)
+  dt$LIENSTATUS = as.factor(dt$LIENSTATUS)
+  dt$PROP_TYPE = as.factor(dt$PROP_TYPE)
+  
+  dt$AMNT = log(dt$AMNT+1)
+  dt$POP = log(dt$POP+1)
+  dt$MED_INC = log(dt$MED_INC+1)
+  dt$OWNOCC = log(dt$OWNOCC+1)
+  dt$APP_INC = log(dt$APP_INC+1)
+  dt$amnt_app_inc = (dt$AMNT)*(dt$APP_INC)
+
+  dt <- within(dt, app_race <- relevel(app_race, ref = "White")) #set race base case to white
+  dt <- within(dt, LOAN_TYPE <- relevel(LOAN_TYPE, ref = '1')) #set race base case to white
+  dt <- within(dt, PURPOSE <- relevel(PURPOSE, ref = '1')) #set race base case to white
+  dt <- within(dt, OCCUPANCY <- relevel(OCCUPANCY, ref = '1')) #set race base case to white
+
+
+  
+  dt = as.data.frame(dt[,c('approved','LOAN_TYPE','PROP_TYPE', 'PURPOSE', 'LIENSTATUS' ,'OCCUPANCY', 'POP', 'MINPOP', 'MA', 'APP_SEX','COAP_SEX','AMNT','APP_INC','amnt_app_inc', 'OWNOCC','MED_INC', 'app_race')])
+  
+  dt = na.omit(dt)
+  return(dt)
+}
+```
+
+
+```{r}
+L1_reduced=clean_data(L1_reduced)
+L2_reduced=clean_data(L2_reduced)
+L3_reduced=clean_data(L3_reduced)
+L4_reduced=clean_data(L4_reduced)
+L5_reduced=clean_data(L5_reduced)
+L6_reduced=clean_data(L6_reduced)
+L7_reduced=clean_data(L7_reduced)
+L8_reduced=clean_data(L8_reduced)
+L9_reduced=clean_data(L9_reduced)
+L10_reduced=clean_data(L10_reduced)
+L11_reduced=clean_data(L11_reduced)
+L12_reduced=clean_data(L12_reduced)
+L13_reduced=clean_data(L13_reduced)
+L14_reduced=clean_data(L14_reduced)
+L15_reduced=clean_data(L15_reduced)
+L16_reduced=clean_data(L16_reduced)
+L17_reduced=clean_data(L17_reduced)
+L18_reduced=clean_data(L18_reduced)
+L19_reduced=clean_data(L19_reduced)
+L20_reduced=clean_data(L20_reduced)
+```
+
+```{r}
+# all_20 <-rbind(L1_reduced,L2_reduced,L3_reduced,L4_reduced,L5_reduced,L6_reduced,L7_reduced,L8_reduced,L9_reduced,L10_reduced,L11_reduced,L12_reduced,L13_reduced,L14_reduced,L15_reduced,L16_reduced,L17_reduced,L18_reduced,L19_reduced,L20_reduced)
+# 
+# library(magrittr)
+# set.seed(123)
+# train20 = sample_frac(all_20, .7)
+# set.seed(123) 
+# test20 = sample_frac(all_20, .3)  
+
+
+dt_all2 = clean_data(dt_all)
+set.seed(123)
+train = sample_frac(dt_all2, .7)
+set.seed(123)
+test = sample_frac(dt_all2, .3)
+
+# write.csv(train, 'train_all.csv')
+# write.csv(test, 'test_all.csv')
+```
+
+
+
+```{r}
+set_model <- function(dt, model_name){
+  if(model_name=="logit") {
+  logitx = glm(approved~LOAN_TYPE+ PURPOSE+ OCCUPANCY+POP+ MINPOP+MA+APP_SEX+AMNT+APP_INC+amnt_app_inc+ OWNOCC+MED_INC +app_race, data=dt, family="binomial"(link='logit'))
+  return (logitx)
+  }
+  if(model_name=="svm") {
+  svmx = svm(approved~LOAN_TYPE+PURPOSE+OCCUPANCY+POP+MINPOP+MA+APP_SEX+AMNT+APP_INC+amnt_app_inc+OWNOCC+MED_INC+app_race, data =dt,data=dt)
+  return (svmx)
+  }
+  if(model_name=="c4.5") {
+  c45x = J48(approved~LOAN_TYPE+PURPOSE+OCCUPANCY+POP+MINPOP+MA+APP_SEX+AMNT+APP_INC+amnt_app_inc+ OWNOCC+MED_INC +app_race, data =dt,data=dt)
+  return(c45x)
+  }
+  if(model_name=="lda") {
+  ldax= lda(approved~LOAN_TYPE+PURPOSE+OCCUPANCY+POP+ MINPOP+MA+APP_SEX+AMNT+APP_INC+amnt_app_inc+ OWNOCC+MED_INC +app_race,data=dt)
+  return(ldax)
+  }
+  if(model_name=="bayes") {
+  bayesx = naiveBayes(dt[,2:15], dt[,1])
+  return(bayesx)
+  }
+  if(model_name=="neuralnet") {
+  nnx= neuralnet(approved~LOAN_TYPE+PURPOSE+OCCUPANCY+POP+ MINPOP+MA+APP_SEX+AMNT+APP_INC+amnt_app_inc+ OWNOCC+MED_INC +app_race,hidden=2, data=dt)
+  return(nnx)
+  }
+}
+```
+
+```{r}
+#ACCURACY LOGIT
+
+
+bayesx = naiveBayes(train[,2:17], train[,1])
+
+bayesx
+
+pred = predict(bayesx, newdata=test, type="raw")
+
+return_prediction <- ifelse(pred[,2] >= 0.5,1,0) # If the predicted probability is greater than 0.5, then the predicted classification will be a return (return==1), otherwise it will be a no return (return==0W 
+misClasificError <- mean(return_prediction != test$approved) # count number of wrong classifications
+print(paste('Accuracy',1-misClasificError)) 
+conf_nb = table('actual'=test$approved, 'predicted'=pred[,2]>=0.5) 
+
+fall_out = (conf[1,2])/(conf[1,2]+conf[1,1])
+```
+
+```{r}
+m = model.matrix(~approved+LOAN_TYPE+ PURPOSE+PROP_TYPE+LIENSTATUS+ OCCUPANCY+POP+ MINPOP+MA+APP_SEX+COAP_SEX+AMNT+APP_INC+ OWNOCC+MED_INC +app_race, data=train)
+cor(m)
+vifcor(m)
+
+
+logitx = glm(approved~LOAN_TYPE+ PURPOSE+PROP_TYPE+LIENSTATUS+ OCCUPANCY+POP+ MINPOP+MA+APP_SEX+AMNT+APP_INC+AMNT*APP_INC+ OWNOCC+MED_INC +app_race, data=train, family="binomial"(link='logit'))
+
+logitx2 = glm(approved~LOAN_TYPE+ PURPOSE+PROP_TYPE+LIENSTATUS+ OCCUPANCY+POP+ MINPOP+MA+APP_SEX+AMNT+APP_INC+ OWNOCC+MED_INC +app_race, data=train, family="binomial"(link='logit'))
+
+gqtest(logitx) 
+bptest(logitx)
+coeftest(logitx, vcov = vcovHC(logitx, "HC1")) 
+summary(logitx)
+with(logitx, null.deviance - deviance)
+with(logitx, df.null - df.residual)
+with(logitx, pchisq(null.deviance - deviance, df.null - df.residual, lower.tail = FALSE))
+
+
+pred = predict(logitx, newdata=test, type="response")
+
+return_prediction <- ifelse(pred >= 0.5,1,0) # If the predicted probability is greater than 0.5, then the predicted classification will be a return (return==1), otherwise it will be a no return (return==0W 
+misClasificError <- mean(return_prediction != test$approved) # count number of wrong classifications
+print(paste('Accuracy',1-misClasificError)) # calculate the correct classification rate. Accuracy is 0.69, meaning the model correctly determines the membership (being 0 vs 1) for 71% of all observations
+conf = table('actual'=test$approved, 'predicted'=pred>=0.5) 
+
+fall_out = (conf[1,2])/(conf[1,2]+conf[1,1])
+```
+
+```{r}
+# library(class)
+# mk = model.matrix(~approved+LOAN_TYPE+ PURPOSE+PROP_TYPE+LIENSTATUS+ OCCUPANCY+POP+ MINPOP+MA+APP_SEX+AMNT+APP_INC+ OWNOCC+MED_INC +app_race, data=train)
+# mktrn = as.data.frame(mk)
+# mktrn = mktrn[,-1]
+# 
+# mktst =model.matrix(~approved+LOAN_TYPE+ PURPOSE+PROP_TYPE+LIENSTATUS+ OCCUPANCY+POP+ MINPOP+MA+APP_SEX+AMNT+APP_INC+ OWNOCC+MED_INC +app_race, data=test)
+# mktst = as.data.frame(mktst)
+# mktst = mktst[,-1]
+# 
+# x_train = mktrn[,2:27]
+# x_test = mktst[,2:27]
+# y_train = mktrn[,1]
+# y_test = mktst[,1]
+# knx = knn(x_train, x_test, y_train, k = 100, prob = TRUE, use.all = TRUE)
+```
+
+```{r}
+fix_fac_levels <- function(data_x, data_y) {
+  for (i in 1:18) {
+    if(is.factor(data_x[,i])) {
+      if(length(levels(data_x[,i]))!=length(levels(data_y[,i]))) {
+        data_y[,i] <- factor(data_y[,i], levels = levels(data_x[,i]))
+      }
+    }
+  }
+  data_y = as.data.frame(data_y, return.index=TRUE)
+  #print(summary(data_y))
+  notna_idx = as.numeric(rownames(subset(data_y, complete.cases(data_y))))
+  #notna_idx = rownames(data_y[which(!is.na(data_y))])
+  notna_idx=as.numeric(notna_idx)
+  #notna_idx<-na.omit(notna_idx)
+  #print(paste("modelsummary(notna_idx))
+  data_y=na.omit(data_y)
+  res_arr<-list(data_y, notna_idx)
+  #print(head(data_y))
+  return(res_arr)
+  #return(data_y)
+}
+
+
+```
+
+
+
+```{r}
+get_consistency_tensor2 <- function(ldata_list, model_name, resp_type) {
+  consistency_tensor = list()
+  
+  for (i in 1:length(ldata_list)) {
+    tmp_data_arr <- list()
+
+    for (j in 1:length(ldata_list)) {
+      if(i!=j) {
+        #print(paste("i:",i, "j:", j))
+        
+        ldata_train <- ldata_list[[j]]
+        ldata_test <- ldata_list[[i]]
+        
+        model_j = set_model(ldata_train, model_name)
+        
+        pred_j = predict(model_j, newdata=ldata_test[2:15], type=resp_type)
+        
+        tmp_data_arr[[j]] <- pred_j
+      } 
+      else {
+        tmp_data_arr[[j]] <- NA
+      }
+    }
+    consistency_tensor[[i]]<-tmp_data_arr
+  }
+  return (consistency_tensor)
+}
+```
+
+
+```{r}
+make_lender_data_list <- function() {
+  
+  lender_data.list <- list(L1_reduced,L2_reduced,L3_reduced, L4_reduced)
+  
+  #lender_data.list <- list(L1_reduced,L2_reduced,L3_reduced,L4_reduced,L5_reduced,L6_reduced,L7_reduced,L8_reduced,L9_reduced,L10_reduced,L11_reduced,L12_reduced,L13_reduced,L14_reduced,L15_reduced,L16_reduced,L17_reduced,L18_reduced,L19_reduced,L20_reduced )
+  
+  return(lender_data.list)
+}
+```
+
+```{r}
+#PRODUCES FINAL OUTPUT WITH A CONSISTENCY SCORE (C_SCORE)
+lender_data.list<-make_lender_data_list()
+
+
+
+ptm <- proc.time()
+#Change name of model and response type (for predict()) to your whichever you are running
+consistencies_list <- get_consistency_tensor2(lender_data.list, "bayes", "raw") 
+time4<- proc.time()-ptm
+
+consistencies_list_2 = consistencies_list
+for(i in 1:length(consistencies_list_2)){
+  consistencies_list_2[[i]]=as.data.frame(consistencies_list_2[[i]])
+  colnames(consistencies_list_2[[i]])<-c("mod1","mod2","mod3","mod4","mod5","mod6","mod7","mod8","mod9","mod10","mod11","mod12","mod13","mod14","mod15","mod16","mod17","mod18","mod19","mod20")
+  consistencies_list_2[[i]]$sd = apply(consistencies_list_2[[i]], 1, sd,na.rm=TRUE)
+  #consistencies_list_2[[i]]=consistencies_list_2[[i]][sapply(consistencies_list_2[[i]], function(x) !all(is.na(x)))] 
+}
+
+
+s <- 0
+n <- 0
+for(i in 1:length(consistencies_list_2)){
+  s= s+sum(consistencies_list_2[[i]]$sd)
+  n = n+nrow(consistencies_list_2[[i]])
+}
+C_SCORE <- s/n
+C_SCORE
+#logit_C_SCORE = C_SCORE
+#bayes_C_SCORE = C_SCORE
+#lda_C_SCORE = C_SCORE
+```
+```{r}
+#Neural Net
+dt = L7_reduced
+dt= sample_n(dt, 2000)
+m <- model.matrix(~approved+LOAN_TYPE+PURPOSE+OCCUPANCY+POP+ MINPOP+MA+APP_SEX+AMNT+APP_INC+amnt_app_inc+ OWNOCC+MED_INC +app_race,data = dt)
+colnames(m)
+m=as.data.frame(m)
+m=m[,-1]
+ptm <- proc.time()
+nnx2= neuralnet(approved~LOAN_TYPE3+PURPOSE3+OCCUPANCY2+POP+ MINPOP+MA+APP_SEX2+APP_SEX3+AMNT+APP_INC+amnt_app_inc+ OWNOCC+MED_INC +app_raceAmerInd+app_raceAsian+app_raceBlack+app_raceLatino+app_racePacIsl,hidden=c(5,3),threshold=0.05, stepmax=1e7,data=m)
+proc.time()-ptm
+print(names(nnx))
+
+nnx2$result.matrix
+
+x = m[10,2:19]
+L7_reduced[10,]
+compute(nnx2, x)
+confidence.interval(nnx2,alpha=0.95)
+```
+
+
+L7_reduced[1]=as.character(L7_reduced[1])
+
+
