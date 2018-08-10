@@ -1,0 +1,439 @@
+---
+title: "Similarity Scoring"
+author:"Greg Murray"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+setwd('/Users/gregmurray/Documents/MachineLearning/Mortgage_Project/hmda14')
+rm(list=ls()) 
+```{r}
+library(magrittr)
+library(data.table)
+library(tidyr)
+library(dplyr)
+library(e1071)
+library(MASS)
+library(neuralnet)
+library(AER)
+library(usdm)
+library(naivebayes)
+```
+
+
+
+```{r}
+lender1=fread('lender1.csv')
+lender2=fread('lender2.csv')
+lender3=fread('lender3.csv')
+lender4=fread('lender4.csv')
+lender5=fread('lender5.csv')
+lender6=fread('lender6.csv')
+lender7=fread('lender7.csv')
+lender8=fread('lender8.csv')
+lender9=fread('lender9.csv')
+lender10=fread('lender10.csv')
+lender11=fread('lender11.csv')
+lender12=fread('lender12.csv')
+lender13=fread('lender13.csv')
+lender14=fread('lender14.csv')
+lender15=fread('lender15.csv')
+lender16=fread('lender16.csv')
+lender17=fread('lender17.csv')
+lender18=fread('lender18.csv')
+lender19=fread('lender19.csv')
+lender20=fread('lender20.csv')
+```
+
+```{r}
+L1_reduced=fread('L1_reduced.csv')[,-1]
+L2_reduced=fread('L2_reduced.csv')[,-1]
+L3_reduced=fread('L3_reduced.csv')[,-1]
+L4_reduced=fread('L4_reduced.csv')[,-1]
+L5_reduced=fread('L5_reduced.csv')[,-1]
+L6_reduced=fread('L6_reduced.csv')[,-1]
+L7_reduced=fread('L7_reduced.csv')[,-1]
+L8_reduced=fread('L8_reduced.csv')[,-1]
+L9_reduced=fread('L9_reduced.csv')[,-1]
+L10_reduced=fread('L10_reduced.csv')[,-1]
+L11_reduced=fread('L11_reduced.csv')[,-1]
+L12_reduced=fread('L12_reduced.csv')[,-1]
+L13_reduced=fread('L13_reduced.csv')[,-1]
+L14_reduced=fread('L14_reduced.csv')[,-1]
+L15_reduced=fread('L15_reduced.csv')[,-1]
+L16_reduced=fread('L16_reduced.csv')[,-1]
+L17_reduced=fread('L17_reduced.csv')[,-1]
+L18_reduced=fread('L18_reduced.csv')[,-1]
+L19_reduced=fread('L19_reduced.csv')[,-1]
+L20_reduced=fread('L20_reduced.csv')[,-1]
+```
+# Cleanup Dataset
+```{r}
+clean_data <- function(dt) {
+  
+  dt$app_race = as.factor(dt$app_race)
+  
+  dt$app_race = as.factor(dt$app_race)
+  dt$APP_SEX = as.factor(dt$APP_SEX)
+  dt$COAP_SEX = as.factor(dt$COAP_SEX)
+  dt$LOAN_TYPE = as.factor(dt$LOAN_TYPE)
+  dt$PURPOSE = as.factor(dt$PURPOSE)
+  dt$OCCUPANCY = as.factor(dt$OCCUPANCY)
+  #dt$LIENSTATUS = as.factor(dt$LIENSTATUS)
+  #dt$PROP_TYPE = as.factor(dt$PROP_TYPE)
+  
+  dt$AMNT = log(dt$AMNT+1)
+  dt$POP = log(dt$POP+1)
+  dt$MED_INC = log(dt$MED_INC+1)
+  dt$OWNOCC = log(dt$OWNOCC+1)
+  dt$APP_INC = log(dt$APP_INC+1)
+  dt$amnt_app_inc = (dt$AMNT)*(dt$APP_INC)
+
+  dt <- within(dt, app_race <- relevel(app_race, ref = "White")) #set race base case to white
+  # dt <- within(dt, LOAN_TYPE <- relevel(LOAN_TYPE, ref = '1')) #set race base case to white
+  # dt <- within(dt, PURPOSE <- relevel(PURPOSE, ref = '1')) #set race base case to white
+   dt <- within(dt, OCCUPANCY <- relevel(OCCUPANCY, ref = '1')) #set race base case to white
+
+
+  
+  dt = as.data.frame(dt[,c('approved','LOAN_TYPE', 'PURPOSE' ,'OCCUPANCY', 'POP', 'MINPOP', 'MA', 'APP_SEX','COAP_SEX','AMNT','APP_INC','amnt_app_inc', 'OWNOCC','MED_INC', 'app_race')])
+  
+  dt = na.omit(dt)
+  return(dt)
+}
+```
+
+```{r}
+lender1=clean_data(lender1)
+lender2=clean_data(lender2)
+lender3=clean_data(lender3)
+lender4=clean_data(lender4)
+lender5=clean_data(lender5)
+lender6=clean_data(lender6)
+lender7=clean_data(lender7)
+lender8=clean_data(lender8)
+lender9=clean_data(lender9)
+lender10=clean_data(lender10)
+lender11=clean_data(lender11)
+lender12=clean_data(lender12)
+lender13=clean_data(lender13)
+lender14=clean_data(lender14)
+lender15=clean_data(lender15)
+lender16=clean_data(lender16)
+lender17=clean_data(lender17)
+lender18=clean_data(lender18)
+lender19=clean_data(lender19)
+lender20=clean_data(lender20)
+```
+
+```{r}
+L1_reduced=clean_data(L1_reduced)
+L2_reduced=clean_data(L2_reduced)
+L3_reduced=clean_data(L3_reduced)
+L4_reduced=clean_data(L4_reduced)
+L5_reduced=clean_data(L5_reduced)
+L6_reduced=clean_data(L6_reduced)
+L7_reduced=clean_data(L7_reduced)
+L8_reduced=clean_data(L8_reduced)
+L9_reduced=clean_data(L9_reduced)
+L10_reduced=clean_data(L10_reduced)
+L11_reduced=clean_data(L11_reduced)
+L12_reduced=clean_data(L12_reduced)
+L13_reduced=clean_data(L13_reduced)
+L14_reduced=clean_data(L14_reduced)
+L15_reduced=clean_data(L15_reduced)
+L16_reduced=clean_data(L16_reduced)
+L17_reduced=clean_data(L17_reduced)
+L18_reduced=clean_data(L18_reduced)
+L19_reduced=clean_data(L19_reduced)
+L20_reduced=clean_data(L20_reduced)
+```
+
+
+
+```{r}
+fix_fac_levels <- function(data_x, data_y, n) {
+  for (i in 1:n) {
+    if(is.factor(data_x[,i])) {
+      if(length(levels(data_x[,i]))!=length(levels(data_y[,i]))) {
+        data_y[,i] <- factor(data_y[,i], levels = levels(data_x[,i]))
+      }
+    }
+  }
+  data_y = as.data.frame(data_y, return.index=TRUE)
+  #print(summary(data_y))
+  notna_idx = as.numeric(rownames(subset(data_y, complete.cases(data_y))))
+  #notna_idx = rownames(data_y[which(!is.na(data_y))])
+  notna_idx=as.numeric(notna_idx)
+  #notna_idx<-na.omit(notna_idx)
+  #print(paste("modelsummary(notna_idx))
+  data_y=na.omit(data_y)
+  res_arr<-list(data_y, notna_idx)
+  #print(head(data_y))
+  return(res_arr)
+  #return(data_y)
+}
+
+
+```
+
+
+
+```{r}
+set_model <- function(dt, model_name){
+  print("in set_model")
+  if(model_name=="logit") {
+  logitx = glm(approved~LOAN_TYPE+ PURPOSE+ OCCUPANCY+POP+ MINPOP+MA+APP_SEX+log(AMNT)+log(APP_INC)+log(amnt_app_inc)+ OWNOCC+MED_INC +app_race, data=dt, family="binomial"(link='logit'))
+  return (logitx)
+  }
+  if(model_name=="svm") {
+  svmx = svm(dt[,2:15], dt[,1])
+  return (svmx)
+  }
+  if(model_name=="c4.5") {
+  c45x = J48(approved~LOAN_TYPE+PURPOSE+OCCUPANCY+POP+MINPOP+MA+APP_SEX+AMNT+APP_INC+amnt_app_inc+ OWNOCC+MED_INC +app_race, data =dt,data=dt)
+  return(c45x)
+  }
+  if(model_name=="lda") {
+  ldax= lda(approved~LOAN_TYPE+PURPOSE+OCCUPANCY+POP+ MINPOP+MA+APP_SEX+AMNT+APP_INC+amnt_app_inc+ OWNOCC+MED_INC +app_race,data=dt)
+  return(ldax)
+  }
+  if(model_name=="qda") {
+  qdax= qda(approved~LOAN_TYPE+PURPOSE+OCCUPANCY+POP+ MINPOP+MA+APP_SEX+AMNT+APP_INC+amnt_app_inc+ OWNOCC+MED_INC +app_race,data=dt)
+  return(qdax)
+  }
+  if(model_name=="bayes") {
+  bayesx = naiveBayes(dt[,2:15], dt[,1])
+  return(bayesx)
+  }
+  if(model_name=="nb") {
+  nbx = naive_bayes(x=dt[,2:15], y=dt[,1], type="prob")
+  return(nbx)
+  }
+}
+```
+
+```{r}
+# #helper function for get_consistency_tensor3
+# predict_j <- function(mod,  test_data, resp_type, i, j, mod_name='') {
+#   if(mod_name=='qda' | mod_name=='lda') {
+#     if(i!=j) {
+#       pred_j = predict(mod, newdata=test_data, type=resp_type)
+#       return (pred_j$posterior)
+#       }
+#     else{
+#       return (NULL)
+#     }
+#   }
+#   else{
+#     if(i!=j) {
+#       pred_j = predict(mod, newdata=test_data, type=resp_type)
+#       return (pred_j)
+#     }
+#     else{
+#       return (NULL)
+#     }
+#   }
+# }
+```
+
+```{r}
+#helper function for get_similarity_matrix. Predicts the model with the test data and returns the posteriors
+predict_i <- function(mod,  test_data, resp_type, mod_name='') {
+  print("in predicr_i")
+  if(mod_name=='qda' | mod_name=='lda') {
+    pred_i = predict(mod, newdata=test_data, type=resp_type)
+    return (pred_i$posterior)
+  }
+
+  else{
+    pred_i = predict(mod, newdata=test_data, type=resp_type)
+    return (pred_i)
+  }
+}
+```
+
+```{r}
+#foreach in parallel combine functions
+library(foreach)
+add<-function(a,b){
+  return (a+b)
+}
+cfun <- function(a,b) {
+  if(class(a)=="list"){
+    #print("in class list")
+    l = length(a)+1
+    a[[l]]=b
+    return (a)
+  }
+  else {
+    #print("else")
+    return( list(a,b))
+  }
+}
+```
+
+```{r}
+append<-function(arr, el) {
+  arr[[length(arr)+1]]<-el
+}
+```
+
+
+  
+```{r}
+#Run in predict() in parallel
+library(foreach)
+library(doParallel)
+library(magrittr)
+
+get_similarity_matrix <- function(client_data, ldata_list, model_name, x_col_start, x_col_end) {
+  resp_type=""
+  if(model_name=="logit"){
+    resp_type="response"
+  }
+  else if(model_name=="bayes"){
+    resp_type="raw"
+  }
+  similarity_matrix = list()
+  
+  foreach(i=1:length(ldata_list), .combine='cfun', .export=c("set_model", "predict_i", "lda", "qda")) %dopar% predict_i(set_model(ldata_list[[i]], model_name), client_data[x_col_start:x_col_end], resp_type, model_name) ->tmp_arr 
+  
+  similarity_matrix[[length(similarity_matrix)+1]]<-tmp_arr
+
+  return (similarity_matrix)
+}
+```
+
+
+
+
+```{r}
+make_lender_data_list <- function(n, m) {
+  L1_sampled<-sample_frac (L1_reduced, n)
+  L2_sampled<-sample_frac(L2_reduced, n)
+  L3_sampled<-sample_frac(L3_reduced, n)
+  L4_sampled<-sample_frac(L4_reduced, n)
+  L5_sampled<-sample_frac(L5_reduced, n)
+  L6_sampled<-sample_frac(L6_reduced, n)
+  L7_sampled<-sample_frac(L7_reduced, n)
+  L8_sampled<-sample_frac(L8_reduced, n)
+  L9_sampled<-sample_frac(L9_reduced, n)
+  L10_sampled<-sample_frac(L10_reduced, n)
+  L11_sampled<-sample_frac(L11_reduced, n)
+  L12_sampled<-sample_frac(L12_reduced, n)
+  L13_sampled<-sample_frac(L13_reduced, n)
+  L14_sampled<-sample_frac(L14_reduced, n)
+  L15_sampled<-sample_frac(L15_reduced, n)
+  L16_sampled<-sample_frac(L16_reduced, n)
+  L17_sampled<-sample_frac(L17_reduced, n)
+  L18_sampled<-sample_frac(L18_reduced, n)
+  L19_sampled<-sample_frac(L19_reduced, n)
+  L20_sampled<-sample_frac(L20_reduced, n)
+  
+  lender_data.list <- list(L1_sampled,L2_sampled,L3_sampled,L4_sampled,L5_sampled,L6_sampled,L7_sampled,L8_sampled,L9_sampled, L10_sampled,L11_sampled,L12_sampled,L13_sampled,L14_sampled,L15_sampled,L16_sampled,L17_sampled,L18_sampled,L19_sampled, L20_sampled)
+# 
+#   lender_data.list <- list(L1_sampled,L2_sampled,L3_sampled,L4_sampled,L5_sampled,L6_sampled,L7_sampled,L8_sampled,L9_sampled, L10_sampled)
+#   
+  #lender_data.list <- list(L1_reduced,L2_reduced,L3_reduced,L4_reduced,L5_reduced,L6_reduced,L7_reduced,L8_reduced,L9_reduced,L10_reduced,L11_reduced,L12_reduced,L13_reduced,L14_reduced,L15_reduced,L16_reduced,L17_reduced,L18_reduced,L19_reduced,L20_reduced )
+  
+  return(lender_data.list[1:m])
+}
+```
+
+```{r}
+#PRODUCES FINAL OUTPUT WITH A CONSISTENCY SCORE (C_SCORE)
+lender_data.list<-make_lender_data_list(1,10)
+
+no_cores = detectCores()-1
+cl <- makeCluster(no_cores)
+registerDoParallel(cl)
+
+#library(naivebayes)
+ptm <- proc.time()
+#Change name of model and response type (for predict()) to whichever algorithm you are running
+
+tryCatch({
+  similarity_matrix <- get_similarity_matrix(L16_reduced, lender_data.list, "logit", 2, 15)
+  },error=function(cond){
+    message(cond)
+    stopCluster(cl)
+    return(NA)
+  })
+
+time_20m_1frac_lda<- proc.time()-ptm
+
+tryCatch({
+  stopCluster(cl)
+  },error=function(cond){
+    message(cond)
+  })
+
+
+# y=c(time_2m_10k_bayes_par[3],time_3m_10k_bayes_par[3],time_4m_10k_bayes_par[3],time_5m_10k_bayes_par[3],time_6m_10k_bayes_par[3],time_7m_10k_bayes_par[3],time_8m_10k_bayes_par[3],time_9m_10k_bayes_par[3],time_10m_10k_bayes_par[3],time_11m_10k_bayes_par[3],time_12m_10k_bayes_par[3],time_13m_10k_bayes_par[3],time_14m_10k_bayes_par[3], time_15m_10k_bayes_par[3], time_16m_10k_bayes_par[3], time_17m_10k_bayes_par[3], time_18m_10k_bayes_par[3])
+# plot(c(2:18),y)
+```
+
+
+```{r}
+client_data<-L16_reduced
+
+# client_trained <-  glm(approved~LOAN_TYPE+ PURPOSE+ OCCUPANCY+POP+ MINPOP+MA+APP_SEX+AMNT+APP_INC+amnt_app_inc+ OWNOCC+MED_INC +app_race, data=client_data, family="binomial"(link='logit'))
+# client_preds <- predict(client_trained, client_data, "response")
+
+similarity_matrix2<-as.data.table(similarity_matrix[[1]])
+
+#the difference between the predicted value for client's data and the other lenders prediction for that individual observation
+similarity_resids<-client_preds-similarity_matrix2 
+sd_v<-apply(similarity_resids, 2, sd) #"standard error" from the "residuals" in similarity_resids
+
+m <- 20 #number of similar lenders to be returned
+
+sd_v= sort(sd_v)[-1]
+sim_score_func<-function(v) {
+  v=1/v
+  #converts the "standard error" to a similarity score between 0 and 1 (0:perfectly dissimilar; 1:perfectly similar)
+  #datasets scored against themselves do not score 0.999, not 1.0, due to rounding error from the similarity function
+  #return(max(0,log(v)^2/(log(v)^2+1)))
+  return(v/(v+1))
+  #return(max(0,exp(v)/(exp(v)+1)))
+}
+sd_v<-sapply(sd_v, sim_score_func)
+#FINAL RETURN OBJECT
+SIMILARITY_TABLE<-data.table(Firm_Number=names(sd_v)[1:m], Similarity_Score=sd_v[1:m]) #table of the top m most similar lenders from most similar to least similar and the corresponding similarity score
+SIMILARITY_TABLE
+
+```
+
+```{r}
+#User interface
+sim<-function( algorithm.model.name, model.indices, client.data, firm.data.list, top_m_similar_firms=5, factor.levels.remove.rows=TRUE, num_cores=NULL, sample_fraction=1) {
+  lender_data.list<-make_lender_data_list(1,20)
+
+  ifelse(is.null*num_cores, no_cores <- detectCores()-1, no_cores=num_cores)
+  cl <- makeCluster(no_cores)
+  registerDoParallel(cl)
+
+  client.data.indexed = apply()
+  tryCatch({
+    similarity_matrix <- get_similarity_matrix(client_data, firm.data.list, algorithm.model.name, 2, 15)
+    },error=function(cond){
+      message(cond)
+      stopCluster(cl)
+      return(NA)
+    })
+  
+  time_20m_1frac_lda<- proc.time()-ptm
+  
+  tryCatch({
+    stopCluster(cl)
+    },error=function(cond){
+      message(cond)
+    })
+
+}
+
+```
