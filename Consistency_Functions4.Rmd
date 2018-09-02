@@ -305,8 +305,6 @@ make_lender_data_list <- function() {
 #PRODUCES FINAL OUTPUT WITH A CONSISTENCY SCORE (C_SCORE)
 lender_data.list<-make_lender_data_list()
 
-
-
 ptm <- proc.time()
 #Change name of model and response type (for predict()) to your whichever you are running
 consistencies_list <- get_consistency_tensor2(lender_data.list, "bayes", "raw") 
@@ -333,28 +331,3 @@ C_SCORE
 #bayes_C_SCORE = C_SCORE
 #lda_C_SCORE = C_SCORE
 ```
-```{r}
-#Neural Net
-dt = L7_reduced
-dt= sample_n(dt, 2000)
-m <- model.matrix(~approved+LOAN_TYPE+PURPOSE+OCCUPANCY+POP+ MINPOP+MA+APP_SEX+AMNT+APP_INC+amnt_app_inc+ OWNOCC+MED_INC +app_race,data = dt)
-colnames(m)
-m=as.data.frame(m)
-m=m[,-1]
-ptm <- proc.time()
-nnx2= neuralnet(approved~LOAN_TYPE3+PURPOSE3+OCCUPANCY2+POP+ MINPOP+MA+APP_SEX2+APP_SEX3+AMNT+APP_INC+amnt_app_inc+ OWNOCC+MED_INC +app_raceAmerInd+app_raceAsian+app_raceBlack+app_raceLatino+app_racePacIsl,hidden=c(5,3),threshold=0.05, stepmax=1e7,data=m)
-proc.time()-ptm
-print(names(nnx))
-
-nnx2$result.matrix
-
-x = m[10,2:19]
-L7_reduced[10,]
-compute(nnx2, x)
-confidence.interval(nnx2,alpha=0.95)
-```
-
-
-L7_reduced[1]=as.character(L7_reduced[1])
-
-
