@@ -9,7 +9,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 setwd('/Users/gregmurray/Documents/MachineLearning/Mortgage_Project/hmda14')
-rm(list=ls()) 
+
 ```{r}
 library(magrittr)
 library(data.table)
