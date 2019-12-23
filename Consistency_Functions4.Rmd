@@ -23,6 +23,7 @@ library(usdm)
 
 
 ```{r}
+#Lender data sets 1-20
 L1_reduced=fread('L1_reduced.csv')[,-1]
 L2_reduced=fread('L2_reduced.csv')[,-1]
 L3_reduced=fread('L3_reduced.csv')[,-1]
