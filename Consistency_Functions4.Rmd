@@ -60,8 +60,6 @@ clean_data <- function(dt) {
   dt = dt[dt$ACTION %in% c(1,2, 3, 7,8)]
   dt$approved = ifelse(dt$ACTION %in% c(1, 2, 8), 1,0)
   dt$app_race[is.na(dt$app_race)] = "NA"
-
-  dt$app_race = as.factor(dt$app_race)
   
   dt$app_race = as.factor(dt$app_race)
   dt$APP_SEX = as.factor(dt$APP_SEX)
