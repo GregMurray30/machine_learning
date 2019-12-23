@@ -167,8 +167,7 @@ set_model <- function(dt, model_name){
 ```
 
 ```{r}
-#ACCURACY LOGIT
-
+#ACCURACY NAIVE BAYES
 
 bayesx = naiveBayes(train[,2:17], train[,1])
 
@@ -185,6 +184,8 @@ fall_out = (conf[1,2])/(conf[1,2]+conf[1,1])
 ```
 
 ```{r}
+#ACCURACY LOGIT
+
 m = model.matrix(~approved+LOAN_TYPE+ PURPOSE+PROP_TYPE+LIENSTATUS+ OCCUPANCY+POP+ MINPOP+MA+APP_SEX+COAP_SEX+AMNT+APP_INC+ OWNOCC+MED_INC +app_race, data=train)
 cor(m)
 vifcor(m)
